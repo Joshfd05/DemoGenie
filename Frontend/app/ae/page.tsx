@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -23,8 +23,10 @@ import {
   Phone,
   Mail,
   Globe,
+  Loader2,
 } from "lucide-react"
 import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
 
 interface Demo {
   id: string
@@ -43,21 +45,51 @@ interface Demo {
   outlets: string
   painPoints: string
   specialNotes?: string
+  // Optional fields from backend
+  prep_brief_status?: string
 }
 
 async function fetchDemos(): Promise<Demo[]> {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
   const res = await fetch(`${baseUrl}/demos`, { cache: "no-store" })
   if (!res.ok) throw new Error("Failed to load demos")
-  return res.json()
+  const raw = await res.json()
+  // Normalize potential backend shapes into the UI Demo interface where possible
+  return (raw as any[]).map((item) => {
+    const scheduledDateTime =
+      item.scheduledDateTime || item.scheduled_time || item.scheduledTime || item.scheduled || new Date().toISOString()
+    return {
+      id: String(item.id ?? item.merchant_id ?? item.merchantId ?? Math.random().toString(36).slice(2)),
+      merchantName: item.merchantName || item.merchant_name || item.merchant || "Merchant",
+      category: item.category || "",
+      scheduledDateTime,
+      aeName: item.aeName || item.ae_name || "",
+      status: (item.status as Demo["status"]) || "upcoming",
+      meetingLink: item.meetingLink || item.meeting_link || "#",
+      address: item.address || "",
+      contactNumber: item.contactNumber || item.contact_number || "",
+      email: item.email || "",
+      website: item.website,
+      socialMedia: item.socialMedia,
+      productsInterested: item.productsInterested || item.products_interested || "",
+      outlets: String(item.outlets ?? ""),
+      painPoints: item.painPoints || item.pain_points || "",
+      specialNotes: item.specialNotes || item.special_notes,
+      prep_brief_status: item.prep_brief_status || item.prepBriefStatus || item.prepStatus || "Pending",
+    } as Demo
+  })
 }
 
 export default function AEPage() {
+  const { toast } = useToast()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [aeName, setAeName] = useState("")
   const [demos, setDemos] = useState<Demo[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [generating, setGenerating] = useState<Record<string, boolean>>({})
+  const [viewing, setViewing] = useState<Record<string, boolean>>({})
+  const [briefs, setBriefs] = useState<Record<string, { insights: string; pitch: string; next_steps: string } | null>>({})
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,6 +109,7 @@ export default function AEPage() {
       .catch((err) => {
         console.error(err)
         if (!cancelled) setError("Failed to load demos")
+        toast({ title: "Failed to load demos", description: String(err), variant: "destructive" })
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -88,6 +121,66 @@ export default function AEPage() {
 
   const upcomingDemos = demos.filter((demo) => demo.status === "upcoming")
   const prepNeededDemos = demos.filter((demo) => demo.status === "prep-needed")
+
+  const baseUrl = useMemo(() => process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000", [])
+
+  function mapBriefPayload(raw: any): { insights: string; pitch: string; next_steps: string } {
+    // Backend fields: insights, pain_points_summary, relevant_features, pitch_suggestions, status
+    const insights = [raw?.insights, raw?.pain_points_summary].filter(Boolean).join("\n\n") || ""
+    const pitch = raw?.pitch_suggestions || raw?.pitch || ""
+    const nextSteps = raw?.next_steps || raw?.relevant_features || raw?.status || ""
+    return { insights, pitch, next_steps: nextSteps }
+  }
+
+  async function handleGenerateBrief(merchantId: string) {
+    try {
+      setGenerating((prev) => ({ ...prev, [merchantId]: true }))
+      const res = await fetch(`${baseUrl}/generate-brief/${merchantId}`, {
+        method: "POST",
+      })
+      if (!res.ok) throw new Error(`Failed to generate brief (${res.status})`)
+      const data = await res.json()
+      // Update brief locally and mark status as Generated
+      setBriefs((prev) => ({ ...prev, [merchantId]: mapBriefPayload(data) }))
+      setDemos((prev) => prev.map((d) => (d.id === merchantId ? { ...d, prep_brief_status: "Generated" } : d)))
+      toast({ title: "Brief generated", description: "Prep brief was generated successfully." })
+    } catch (err) {
+      console.error(err)
+      toast({ title: "Error", description: String(err), variant: "destructive" })
+    } finally {
+      setGenerating((prev) => ({ ...prev, [merchantId]: false }))
+    }
+  }
+
+  async function handleViewBrief(merchantId: string) {
+    try {
+      setViewing((prev) => ({ ...prev, [merchantId]: true }))
+      const res = await fetch(`${baseUrl}/prep-brief/${merchantId}`, { method: "GET", cache: "no-store" })
+      if (!res.ok) throw new Error(`Failed to fetch brief (${res.status})`)
+      const data = await res.json()
+      setBriefs((prev) => ({ ...prev, [merchantId]: mapBriefPayload(data) }))
+    } catch (err) {
+      console.error(err)
+      toast({ title: "Error", description: String(err), variant: "destructive" })
+    } finally {
+      setViewing((prev) => ({ ...prev, [merchantId]: false }))
+    }
+  }
+
+  // Dashboard stats
+  const stats = useMemo(() => {
+    const today = new Date()
+    const isSameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+    const todaysCount = demos.reduce((acc, d) => {
+      const dt = new Date(d.scheduledDateTime)
+      return acc + (isSameDay(today, dt) ? 1 : 0)
+    }, 0)
+    const total = demos.length
+    const generated = demos.reduce((acc, d) => acc + (d.prep_brief_status === "Generated" ? 1 : 0), 0)
+    const pending = total - generated
+    const rate = total > 0 ? Math.round((generated / total) * 100) : 0
+    return { todaysCount, pending, rate }
+  }, [demos])
 
   if (!isLoggedIn) {
     return (
@@ -154,7 +247,7 @@ export default function AEPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Today's Demos</p>
-                  <p className="text-2xl font-bold">2</p>
+                  <p className="text-2xl font-bold">{stats.todaysCount}</p>
                 </div>
                 <Calendar className="w-8 h-8 text-primary" />
               </div>
@@ -166,7 +259,7 @@ export default function AEPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Prep Briefs Pending</p>
-                  <p className="text-2xl font-bold">1</p>
+                  <p className="text-2xl font-bold">{stats.pending}</p>
                 </div>
                 <Sparkles className="w-8 h-8 text-secondary" />
               </div>
@@ -178,7 +271,7 @@ export default function AEPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Conversion Rate</p>
-                  <p className="text-2xl font-bold">85%</p>
+                  <p className="text-2xl font-bold">{stats.rate}%</p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-accent" />
               </div>
@@ -265,6 +358,23 @@ export default function AEPage() {
                             <ExternalLink className="w-4 h-4" />
                           </a>
                         </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleGenerateBrief(demo.id)}
+                          disabled={!!generating[demo.id]}
+                        >
+                          {generating[demo.id] ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Generating
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              Generate Brief
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -281,6 +391,40 @@ export default function AEPage() {
                     <CardTitle className="flex items-center justify-between">
                       <span>{demo.merchantName} - Prep Brief</span>
                       <div className="flex gap-2">
+                        {demo.prep_brief_status === "Generated" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewBrief(demo.id)}
+                            disabled={!!viewing[demo.id]}
+                          >
+                            {viewing[demo.id] ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Loading
+                              </>
+                            ) : (
+                              <>
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                View Brief
+                              </>
+                            )}
+                          </Button>
+                        ) : (
+                          <Button size="sm" onClick={() => handleGenerateBrief(demo.id)} disabled={!!generating[demo.id]}>
+                            {generating[demo.id] ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Generating
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Generate Brief
+                              </>
+                            )}
+                          </Button>
+                        )}
                         <Button variant="outline" size="sm">
                           <Download className="w-4 h-4 mr-2" />
                           Download PDF
@@ -344,35 +488,32 @@ export default function AEPage() {
                       <p className="text-sm mt-1 p-3 bg-muted/30 rounded-lg">{demo.painPoints}</p>
                     </div>
 
-                    {/* AI Insights */}
+                    {/* Prep Brief Content */}
                     <div className="glass-strong p-4 rounded-lg">
                       <h4 className="font-semibold mb-3 flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-primary" />
-                        AI-Generated Insights
+                        Prep Brief
                       </h4>
-                      <div className="space-y-3 text-sm">
-                        <div>
-                          <Label className="font-medium">Company Analysis</Label>
-                          <p className="text-muted-foreground">
-                            {demo.category} restaurant with {demo.outlets.toLowerCase()} focusing on operational
-                            efficiency. Strong online presence suggests tech-savvy management.
-                          </p>
+                      {briefs[demo.id] ? (
+                        <div className="space-y-3 text-sm">
+                          <div>
+                            <Label className="font-medium">Insights</Label>
+                            <p className="text-muted-foreground whitespace-pre-wrap">{briefs[demo.id]?.insights}</p>
+                          </div>
+                          <div>
+                            <Label className="font-medium">Pitch</Label>
+                            <p className="text-muted-foreground whitespace-pre-wrap">{briefs[demo.id]?.pitch}</p>
+                          </div>
+                          <div>
+                            <Label className="font-medium">Next Steps</Label>
+                            <p className="text-muted-foreground whitespace-pre-wrap">{briefs[demo.id]?.next_steps}</p>
+                          </div>
                         </div>
-                        <div>
-                          <Label className="font-medium">Recommended Focus Areas</Label>
-                          <p className="text-muted-foreground">
-                            Emphasize inventory management features, multi-location reporting, and integration
-                            capabilities.
-                          </p>
-                        </div>
-                        <div>
-                          <Label className="font-medium">Pitch Suggestions</Label>
-                          <p className="text-muted-foreground">
-                            Lead with ROI calculations for inventory optimization. Demonstrate real-time reporting
-                            across locations.
-                          </p>
-                        </div>
-                      </div>
+                      ) : demo.prep_brief_status === "Generated" ? (
+                        <p className="text-sm text-muted-foreground">Click "View Brief" to load the latest prep brief.</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No brief yet. Generate one to get started.</p>
+                      )}
                     </div>
 
                     {demo.specialNotes && (
