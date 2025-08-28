@@ -11,8 +11,25 @@ FastAPI backend that powers the DemoGenie frontend. Provides endpoints to replac
 cd /home/joshua/DemoGenie/Backend
 python -m venv .venv
 source .venv/bin/activate
-pip install fastapi uvicorn pydantic
+pip install -r requirements.txt
 ```
+
+## AI Setup (Optional)
+For AI-powered prep brief generation:
+
+1. **Get OpenAI API Key**
+   - Visit https://platform.openai.com/api-keys
+   - Create a new API key
+
+2. **Configure Environment**
+   ```bash
+   cp env.example .env
+   # Edit .env and add your OpenAI API key
+   ```
+
+3. **Test AI Integration**
+   - Generate a prep brief from the AE dashboard
+   - Check console logs for AI status
 
 ## Run
 ```bash
@@ -37,6 +54,7 @@ python -m Backend.main
 ## Notes
 - Uses in-memory storage with seeded AEs and bookings for demo speed
 - JSON response keys mirror the frontend dummy objects so no UI changes are required
-- Calendar and AI integrations are mocked; swap out in utils.py
+- AI integration automatically falls back to mock data if OpenAI is unavailable
+- Calendar integration is mocked; swap out in utils.py
 
 
