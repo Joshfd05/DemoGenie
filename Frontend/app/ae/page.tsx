@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -45,47 +45,19 @@ interface Demo {
   specialNotes?: string
 }
 
-const mockDemos: Demo[] = [
-  {
-    id: "1",
-    merchantName: "Bella Vista Restaurant",
-    category: "Fine Dining",
-    scheduledDateTime: "2024-01-15T14:00",
-    aeName: "Sarah Johnson",
-    status: "upcoming",
-    meetingLink: "https://meet.google.com/abc-defg-hij",
-    address: "123 Main St, Downtown",
-    contactNumber: "+1 (555) 123-4567",
-    email: "owner@bellavista.com",
-    website: "https://bellavista.com",
-    socialMedia: "@bellavista_restaurant",
-    productsInterested: "Complete Suite",
-    outlets: "2-5 Locations",
-    painPoints: "Struggling with inventory management across multiple locations",
-    specialNotes: "Interested in integration with existing accounting software",
-  },
-  {
-    id: "2",
-    merchantName: "Quick Bites Cafe",
-    category: "Fast Casual",
-    scheduledDateTime: "2024-01-16T10:30",
-    aeName: "Mike Chen",
-    status: "prep-needed",
-    meetingLink: "https://zoom.us/j/123456789",
-    address: "456 Oak Ave, Midtown",
-    contactNumber: "+1 (555) 987-6543",
-    email: "manager@quickbites.com",
-    productsInterested: "POS System, Online Ordering",
-    outlets: "1 Location",
-    painPoints: "Need better online ordering system and delivery integration",
-    specialNotes: "Currently using Square, looking to upgrade",
-  },
-]
+async function fetchDemos(): Promise<Demo[]> {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
+  const res = await fetch(`${baseUrl}/demos`, { cache: "no-store" })
+  if (!res.ok) throw new Error("Failed to load demos")
+  return res.json()
+}
 
 export default function AEPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [aeName, setAeName] = useState("")
-  const [demos] = useState<Demo[]>(mockDemos)
+  const [demos, setDemos] = useState<Demo[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,6 +65,26 @@ export default function AEPage() {
       setIsLoggedIn(true)
     }
   }
+
+  useEffect(() => {
+    if (!isLoggedIn) return
+    let cancelled = false
+    setLoading(true)
+    fetchDemos()
+      .then((data) => {
+        if (!cancelled) setDemos(data)
+      })
+      .catch((err) => {
+        console.error(err)
+        if (!cancelled) setError("Failed to load demos")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isLoggedIn])
 
   const upcomingDemos = demos.filter((demo) => demo.status === "upcoming")
   const prepNeededDemos = demos.filter((demo) => demo.status === "prep-needed")
@@ -195,7 +187,21 @@ export default function AEPage() {
         </div>
 
         {/* Next Demo Card */}
-        {upcomingDemos.length > 0 && (
+        {loading && (
+          <Card className="glass mb-8">
+            <CardHeader>
+              <CardTitle>Loading demos…</CardTitle>
+            </CardHeader>
+          </Card>
+        )}
+        {error && (
+          <Card className="glass mb-8">
+            <CardHeader>
+              <CardTitle>{error}</CardTitle>
+            </CardHeader>
+          </Card>
+        )}
+        {!loading && !error && upcomingDemos.length > 0 && (
           <Card className="glass mb-8">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -239,7 +245,7 @@ export default function AEPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {demos.map((demo) => (
+                  {!loading && demos.map((demo) => (
                     <div key={demo.id} className="flex items-center justify-between p-4 glass rounded-lg hover-glow">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">

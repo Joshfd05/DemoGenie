@@ -97,19 +97,42 @@ export default function MerchantPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 3000))
-
-    // Mock confirmation data
-    setConfirmation({
-      merchantName: formData.merchantName,
-      aeName: "Sarah Johnson",
-      scheduledDateTime: formData.preferredDateTime,
-      meetingLink: "https://meet.google.com/abc-defg-hij",
-    })
-
-    setIsLoading(false)
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
+      const res = await fetch(`${baseUrl}/book-demo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          merchant_name: formData.merchantName,
+          address: formData.address,
+          contact_number: formData.contactNumber,
+          email: formData.email,
+          products_interested: formData.productsInterested,
+          preferred_time: formData.preferredDateTime,
+          website_links: formData.website || null,
+          social_media: formData.socialMedia || null,
+          restaurant_category: formData.category,
+          number_of_outlets: formData.outlets,
+          current_pain_points: formData.painPoints || "",
+          special_notes: formData.specialNotes || null,
+        }),
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to book demo: ${res.status}`)
+      }
+      const data: DemoConfirmation = await res.json()
+      setConfirmation(data)
+    } catch (err) {
+      console.error(err)
+      setConfirmation({
+        merchantName: formData.merchantName,
+        aeName: "",
+        scheduledDateTime: formData.preferredDateTime,
+        meetingLink: "",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   if (isLoading) {
