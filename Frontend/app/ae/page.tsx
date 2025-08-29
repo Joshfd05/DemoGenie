@@ -10,6 +10,13 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
   Calendar,
   Users,
   Clock,
@@ -24,9 +31,11 @@ import {
   Mail,
   Globe,
   Loader2,
+  FileText,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
+import jsPDF from "jspdf"
 
 interface Demo {
   id: string
@@ -90,6 +99,8 @@ export default function AEPage() {
   const [generating, setGenerating] = useState<Record<string, boolean>>({})
   const [viewing, setViewing] = useState<Record<string, boolean>>({})
   const [briefs, setBriefs] = useState<Record<string, { insights: string; pitch: string; next_steps: string } | null>>({})
+  const [previewModalOpen, setPreviewModalOpen] = useState<string | null>(null)
+  const [generatingPDF, setGeneratingPDF] = useState<Record<string, boolean>>({})
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -165,6 +176,175 @@ export default function AEPage() {
     } finally {
       setViewing((prev) => ({ ...prev, [merchantId]: false }))
     }
+  }
+
+  // Function to generate PDF from prep brief data
+  const generatePDF = async (demo: Demo, briefData: { insights: string; pitch: string; next_steps: string }) => {
+    try {
+      setGeneratingPDF(prev => ({ ...prev, [demo.id]: true }))
+      
+      const doc = new jsPDF()
+      
+      // Set document properties
+      doc.setProperties({
+        title: `Prep Brief - ${demo.merchantName}`,
+        subject: 'Demo Preparation Briefing',
+        author: aeName,
+        creator: 'DemoGenie'
+      })
+
+      // Add header
+      doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Demo Preparation Brief', 105, 20, { align: 'center' })
+      
+      // Add merchant info section
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Merchant Information', 20, 40)
+      
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Name: ${demo.merchantName}`, 20, 50)
+      doc.text(`Category: ${demo.category}`, 20, 57)
+      doc.text(`Address: ${demo.address || 'N/A'}`, 20, 64)
+      doc.text(`Contact: ${demo.contactNumber || 'N/A'}`, 20, 71)
+      doc.text(`Email: ${demo.email || 'N/A'}`, 20, 78)
+      if (demo.website) {
+        doc.text(`Website: ${demo.website}`, 20, 85)
+      }
+      
+      // Add business details
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Business Details', 20, 100)
+      
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Products Interested: ${demo.productsInterested || 'N/A'}`, 20, 110)
+      doc.text(`Number of Outlets: ${demo.outlets || 'N/A'}`, 20, 117)
+      
+      // Add pain points
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Current Pain Points', 20, 135)
+      
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      const painPoints = demo.painPoints || 'No pain points specified'
+      const painPointsLines = doc.splitTextToSize(painPoints, 170)
+      doc.text(painPointsLines, 20, 145)
+      
+      // Add special notes if available
+      let currentY = 145 + (painPointsLines.length * 7) + 20
+      if (demo.specialNotes) {
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Special Notes', 20, currentY)
+        
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        const specialNotesLines = doc.splitTextToSize(demo.specialNotes, 170)
+        doc.text(specialNotesLines, 20, currentY + 10)
+        currentY += 10 + (specialNotesLines.length * 7) + 10
+      }
+      
+      // Add AI-generated insights
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text('AI-Generated Insights', 20, currentY)
+      
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      if (briefData.insights) {
+        const insightsLines = doc.splitTextToSize(briefData.insights, 170)
+        doc.text(insightsLines, 20, currentY + 10)
+        currentY += 10 + (insightsLines.length * 7) + 10
+      } else {
+        currentY += 20
+      }
+      
+      // Add pitch suggestions
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Pitch Suggestions', 20, currentY)
+      
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      if (briefData.pitch) {
+        const pitchLines = doc.splitTextToSize(briefData.pitch, 170)
+        doc.text(pitchLines, 20, currentY + 10)
+        currentY += 10 + (pitchLines.length * 7) + 10
+      } else {
+        currentY += 20
+      }
+      
+      // Add next steps
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Next Steps & Features', 20, currentY)
+      
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      if (briefData.next_steps) {
+        const nextStepsLines = doc.splitTextToSize(briefData.next_steps, 170)
+        doc.text(nextStepsLines, 20, currentY + 10)
+      }
+      
+      // Add footer
+      const pageHeight = doc.internal.pageSize.height
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'italic')
+      doc.text(`Generated by ${aeName} on ${new Date().toLocaleDateString()}`, 20, pageHeight - 20)
+      doc.text('DemoGenie - AI-Powered Demo Preparation', 105, pageHeight - 15, { align: 'center' })
+      
+      // Save the PDF
+      const fileName = `PrepBrief_${demo.merchantName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
+      doc.save(fileName)
+      
+      toast({ 
+        title: "PDF Generated", 
+        description: `Prep brief for ${demo.merchantName} has been downloaded successfully.` 
+      })
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      toast({ 
+        title: "PDF Generation Failed", 
+        description: "There was an error generating the PDF. Please try again.", 
+        variant: "destructive" 
+      })
+    } finally {
+      setGeneratingPDF(prev => ({ ...prev, [demo.id]: false }))
+    }
+  }
+
+  // Function to handle download PDF button click
+  const handleDownloadPDF = (demo: Demo) => {
+    // Check if prep brief exists
+    if (!briefs[demo.id] && demo.prep_brief_status !== "Generated") {
+      toast({ 
+        title: "No Prep Brief Available", 
+        description: "Generate the briefing first before downloading.", 
+        variant: "destructive" 
+      })
+      return
+    }
+    
+    // If brief data is not loaded, load it first
+    if (!briefs[demo.id]) {
+      handleViewBrief(demo.id).then(() => {
+        // After loading, try to generate PDF again
+        setTimeout(() => {
+          if (briefs[demo.id]) {
+            generatePDF(demo, briefs[demo.id]!)
+          }
+        }, 500)
+      })
+      return
+    }
+    
+    // Generate PDF with existing data
+    generatePDF(demo, briefs[demo.id]!)
   }
 
   // Dashboard stats
@@ -375,6 +555,16 @@ export default function AEPage() {
                             </>
                           )}
                         </Button>
+                        {demo.prep_brief_status === "Generated" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPreviewModalOpen(demo.id)}
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            Preview
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -392,24 +582,258 @@ export default function AEPage() {
                       <span>{demo.merchantName} - Prep Brief</span>
                       <div className="flex gap-2">
                         {demo.prep_brief_status === "Generated" ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewBrief(demo.id)}
-                            disabled={!!viewing[demo.id]}
-                          >
-                            {viewing[demo.id] ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Loading
-                              </>
-                            ) : (
-                              <>
-                                <ExternalLink className="w-4 h-4 mr-2" />
-                                View Brief
-                              </>
-                            )}
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewBrief(demo.id)}
+                              disabled={!!viewing[demo.id]}
+                            >
+                              {viewing[demo.id] ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Loading
+                                </>
+                              ) : (
+                                <>
+                                  <ExternalLink className="w-4 h-4 mr-2" />
+                                  View Brief
+                                </>
+                              )}
+                            </Button>
+                            <Dialog open={previewModalOpen === demo.id} onOpenChange={(open) => setPreviewModalOpen(open ? demo.id : null)}>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <FileText className="w-4 h-4 mr-2" />
+                                  Preview
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto w-[95vw] md:w-auto animate-in fade-in-0 zoom-in-95 duration-200 shadow-2xl bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border border-border/50 rounded-xl">
+                                <DialogHeader className="pb-4 border-b border-muted">
+                                  <DialogTitle className="flex items-center justify-between">
+                                    <span className="flex items-center gap-2">
+                                      <FileText className="w-5 h-5 text-primary" />
+                                      Prep Brief Preview - {demo.merchantName}
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setPreviewModalOpen(null)}
+                                      className="h-8 w-8 p-0 hover:bg-muted"
+                                    >
+                                      <span className="sr-only">Close</span>
+                                      ×
+                                    </Button>
+                                  </DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-6 px-2">
+                                  {/* Header Info */}
+                                  <div className="text-center pb-4 border-b border-muted">
+                                    <h3 className="text-lg font-semibold text-foreground mb-2">{demo.merchantName}</h3>
+                                    <p className="text-sm text-muted-foreground">Demo scheduled for {new Date(demo.scheduledDateTime).toLocaleDateString()}</p>
+                                  </div>
+                                  
+                                  {/* Merchant Information */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-gradient-to-br from-muted/30 to-muted/50 rounded-lg border">
+                                    <div className="space-y-4">
+                                      <h5 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Contact Details</h5>
+                                      <div className="space-y-3">
+                                        <div className="flex items-center gap-3">
+                                          <MapPin className="w-4 h-4 text-primary" />
+                                          <div>
+                                            <span className="text-xs font-medium text-muted-foreground uppercase">Address</span>
+                                            <p className="text-sm">{demo.address || 'Not specified'}</p>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          <Phone className="w-4 h-4 text-primary" />
+                                          <div>
+                                            <span className="text-xs font-medium text-muted-foreground uppercase">Contact</span>
+                                            <p className="text-sm">{demo.contactNumber || 'Not specified'}</p>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          <Mail className="w-4 h-4 text-primary" />
+                                          <div>
+                                            <span className="text-xs font-medium text-muted-foreground uppercase">Email</span>
+                                            <p className="text-sm">{demo.email || 'Not specified'}</p>
+                                          </div>
+                                        </div>
+                                        {demo.website && (
+                                          <div className="flex items-center gap-3">
+                                            <Globe className="w-4 h-4 text-primary" />
+                                            <div>
+                                              <span className="text-xs font-medium text-muted-foreground uppercase">Website</span>
+                                              <a
+                                                href={demo.website}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm text-primary hover:underline"
+                                              >
+                                                {demo.website}
+                                              </a>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                      <h5 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Business Details</h5>
+                                      <div className="space-y-3">
+                                        <div>
+                                          <span className="text-xs font-medium text-muted-foreground uppercase">Category</span>
+                                          <p className="text-sm">{demo.category || 'Not specified'}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-xs font-medium text-muted-foreground uppercase">Products Interested</span>
+                                          <p className="text-sm">{demo.productsInterested || 'Not specified'}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-xs font-medium text-muted-foreground uppercase">Number of Outlets</span>
+                                          <p className="text-sm">{demo.outlets || 'Not specified'}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Pain Points */}
+                                  <div className="p-6 bg-gradient-to-br from-red-50 to-red-100 rounded-lg border border-red-200">
+                                    <h4 className="font-semibold mb-3 flex items-center gap-2 text-red-800">
+                                      <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                                      Current Pain Points
+                                    </h4>
+                                    <p className="text-sm text-red-700">{demo.painPoints || 'No pain points specified'}</p>
+                                  </div>
+
+                                  {/* AI-Generated Insights */}
+                                  {briefs[demo.id] ? (
+                                    <div className="space-y-4">
+                                      <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                                        <h4 className="font-semibold mb-3 flex items-center gap-2 text-blue-800">
+                                          <Sparkles className="w-4 h-4 text-blue-600" />
+                                          AI-Generated Insights
+                                        </h4>
+                                        <p className="text-sm text-blue-700 whitespace-pre-wrap">{briefs[demo.id]?.insights || 'No insights available'}</p>
+                                      </div>
+                                      
+                                      <div className="p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+                                        <h4 className="font-semibold mb-3 flex items-center gap-2 text-green-800">
+                                          <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                                          Pitch Suggestions
+                                        </h4>
+                                        <p className="text-sm text-green-700 whitespace-pre-wrap">{briefs[demo.id]?.pitch || 'No pitch suggestions available'}</p>
+                                      </div>
+                                      
+                                      <div className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+                                        <h4 className="font-semibold mb-3 flex items-center gap-2 text-purple-800">
+                                          <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                                          Next Steps & Features
+                                        </h4>
+                                        <p className="text-sm text-purple-700 whitespace-pre-wrap">{briefs[demo.id]?.next_steps || 'No next steps available'}</p>
+                                      </div>
+                                    </div>
+                                  ) : demo.prep_brief_status === "Generated" ? (
+                                    <div className="p-6 bg-muted/30 rounded-lg border-2 border-dashed border-muted-foreground/20">
+                                      <div className="text-center">
+                                        <FileText className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
+                                        <p className="text-sm text-muted-foreground mb-3">Prep brief data not loaded yet</p>
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleViewBrief(demo.id)}
+                                          disabled={!!viewing[demo.id]}
+                                        >
+                                          {viewing[demo.id] ? (
+                                            <>
+                                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                              Loading...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <ExternalLink className="w-4 h-4 mr-2" />
+                                              Load Brief Data
+                                            </>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="p-6 bg-muted/30 rounded-lg border-2 border-dashed border-muted-foreground/20">
+                                      <div className="text-center">
+                                        <Sparkles className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                                        <p className="text-sm text-muted-foreground mb-3">No prep brief available yet</p>
+                                        <p className="text-xs text-muted-foreground mb-4">Generate a prep brief to see AI insights and suggestions</p>
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleGenerateBrief(demo.id)}
+                                          disabled={!!generating[demo.id]}
+                                        >
+                                          {generating[demo.id] ? (
+                                            <>
+                                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                              Generating...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Sparkles className="w-4 h-4 mr-2" />
+                                              Generate Brief
+                                            </>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Special Notes */}
+                                  {demo.specialNotes && (
+                                    <div className="p-6 bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg border border-amber-200">
+                                      <h4 className="font-semibold mb-3 flex items-center gap-2 text-amber-800">
+                                        <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+                                        Special Notes
+                                      </h4>
+                                      <p className="text-sm text-amber-700">{demo.specialNotes}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Action Buttons */}
+                                  <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-muted">
+                                    <Button 
+                                      onClick={() => generatePDF(demo, briefs[demo.id]!)}
+                                      className="flex-1 h-12 text-sm"
+                                      disabled={!briefs[demo.id] || !!generatingPDF[demo.id]}
+                                    >
+                                      {generatingPDF[demo.id] ? (
+                                        <>
+                                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                          Generating PDF...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Download className="w-4 h-4 mr-2" />
+                                          Download PDF
+                                        </>
+                                      )}
+                                    </Button>
+                                    <Button 
+                                      variant="outline" 
+                                      onClick={() => setPreviewModalOpen(null)}
+                                      className="flex-1 h-12 text-sm"
+                                    >
+                                      Close Preview
+                                    </Button>
+                                  </div>
+                                  
+                                  {/* Help Text */}
+                                  {!briefs[demo.id] && demo.prep_brief_status === "Generated" && (
+                                    <div className="text-center pt-2">
+                                      <p className="text-xs text-muted-foreground">
+                                        💡 Load the brief data first to enable PDF download
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          </>
                         ) : (
                           <Button size="sm" onClick={() => handleGenerateBrief(demo.id)} disabled={!!generating[demo.id]}>
                             {generating[demo.id] ? (
@@ -425,9 +849,23 @@ export default function AEPage() {
                             )}
                           </Button>
                         )}
-                        <Button variant="outline" size="sm">
-                          <Download className="w-4 h-4 mr-2" />
-                          Download PDF
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleDownloadPDF(demo)}
+                          disabled={demo.prep_brief_status !== "Generated" || !!generatingPDF[demo.id]}
+                        >
+                          {generatingPDF[demo.id] ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Generating PDF...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4 mr-2" />
+                              Download PDF
+                            </>
+                          )}
                         </Button>
                         <Button size="sm">
                           <CheckCircle className="w-4 h-4 mr-2" />
@@ -510,9 +948,34 @@ export default function AEPage() {
                           </div>
                         </div>
                       ) : demo.prep_brief_status === "Generated" ? (
-                        <p className="text-sm text-muted-foreground">Click "View Brief" to load the latest prep brief.</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground">Click "View Brief" to load the latest prep brief.</p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPreviewModalOpen(demo.id)}
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            Preview Brief
+                          </Button>
+                        </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground">No brief yet. Generate one to get started.</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground">No brief yet. Generate one to get started.</p>
+                          <div className="relative group">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled
+                            >
+                              <Download className="w-4 h-4 mr-2" />
+                              Download PDF
+                            </Button>
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                              Generate a prep brief first
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
 
