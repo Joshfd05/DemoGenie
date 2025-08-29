@@ -101,6 +101,7 @@ export default function AEPage() {
   const [briefs, setBriefs] = useState<Record<string, { insights: string; pitch: string; next_steps: string } | null>>({})
   const [previewModalOpen, setPreviewModalOpen] = useState<string | null>(null)
   const [generatingPDF, setGeneratingPDF] = useState<Record<string, boolean>>({})
+  const [markingComplete, setMarkingComplete] = useState<Record<string, boolean>>({})
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -141,6 +142,44 @@ export default function AEPage() {
     const pitch = raw?.pitch_suggestions || raw?.pitch || ""
     const nextSteps = raw?.next_steps || raw?.relevant_features || raw?.status || ""
     return { insights, pitch, next_steps: nextSteps }
+  }
+
+  const handleMarkComplete = async (demo: Demo) => {
+    if (markingComplete[demo.id]) return
+    
+    setMarkingComplete(prev => ({ ...prev, [demo.id]: true }))
+    
+    try {
+      const response = await fetch(`${baseUrl}/demos/${demo.id}/complete`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (response.ok) {
+        // Update local state
+        setDemos(prev => prev.map(d => 
+          d.id === demo.id ? { ...d, status: 'completed' as const } : d
+        ))
+        
+        toast({
+          title: "Demo marked as complete",
+          description: "The demo has been successfully marked as completed.",
+        })
+      } else {
+        throw new Error('Failed to mark demo as complete')
+      }
+    } catch (error) {
+      console.error('Error marking demo as complete:', error)
+      toast({
+        title: "Error",
+        description: "Failed to mark demo as complete. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setMarkingComplete(prev => ({ ...prev, [demo.id]: false }))
+    }
   }
 
   async function handleGenerateBrief(merchantId: string) {
@@ -867,9 +906,27 @@ export default function AEPage() {
                             </>
                           )}
                         </Button>
-                        <Button size="sm">
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Mark Complete
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleMarkComplete(demo)}
+                          disabled={demo.status === "completed" || !!markingComplete[demo.id]}
+                        >
+                          {markingComplete[demo.id] ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Marking...
+                            </>
+                          ) : demo.status === "completed" ? (
+                            <>
+                              <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                              Completed
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Mark Complete
+                            </>
+                          )}
                         </Button>
                       </div>
                     </CardTitle>

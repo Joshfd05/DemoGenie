@@ -97,8 +97,8 @@ def list_demos(db: Session = Depends(get_db)) -> List[DemoCard]:
             ae = db.query(AEModel).filter(AEModel.id == b.assigned_ae_id).first()
             ae_name = ae.name if ae else ""
         
-        # Determine status similar to mock: if brief pending -> prep-needed else upcoming
-        status = "prep-needed" if b.prep_brief_status != "Generated" else "upcoming"
+        # Use the status field from database, fallback to logic if not set
+        status = b.status if hasattr(b, 'status') and b.status else ("prep-needed" if b.prep_brief_status != "Generated" else "upcoming")
         
         # Parse products_interested from JSON string
         products_list = []
@@ -225,5 +225,20 @@ def calendar_events_mock(db: Session = Depends(get_db)):
             for ae in aes
         ]
     }
+
+
+@router.put("/demos/{demo_id}/complete")
+def mark_demo_complete(demo_id: UUID, db: Session = Depends(get_db)):
+    """Mark a demo as completed."""
+    booking = db.query(MerchantBookingModel).filter(MerchantBookingModel.id == demo_id).first()
+    
+    if not booking:
+        raise HTTPException(status_code=404, detail="Demo not found")
+    
+    booking.status = "completed"
+    db.commit()
+    db.refresh(booking)
+    
+    return {"message": "Demo marked as completed", "status": "completed"}
 
 

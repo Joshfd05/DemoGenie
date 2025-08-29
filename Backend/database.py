@@ -57,6 +57,7 @@ class MerchantBookingModel(Base):
     scheduled_time = Column(DateTime)
     meeting_link = Column(String)
     prep_brief_status = Column(String, default="Pending")
+    status = Column(String, default="upcoming")  # upcoming, completed, prep-needed
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -136,7 +137,8 @@ def seed_data():
             assigned_ae_id=ae1.id,
             scheduled_time=datetime(2024, 1, 15, 14, 0),
             meeting_link="https://meet.google.com/abc-defg-hij",
-            prep_brief_status="Pending"
+            prep_brief_status="Pending",
+            status="upcoming"
         )
         
         booking2 = MerchantBookingModel(
@@ -153,7 +155,8 @@ def seed_data():
             assigned_ae_id=ae2.id,
             scheduled_time=datetime(2024, 1, 16, 10, 30),
             meeting_link="https://zoom.us/j/123456789",
-            prep_brief_status="Pending"
+            prep_brief_status="Pending",
+            status="upcoming"
         )
         
         db.add_all([booking1, booking2])
