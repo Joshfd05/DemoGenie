@@ -232,110 +232,185 @@ export default function AEPage() {
         creator: 'DemoGenie'
       })
 
-      // Add header
-      doc.setFontSize(20)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Demo Preparation Brief', 105, 20, { align: 'center' })
-      
-      // Add merchant info section
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Merchant Information', 20, 40)
-      
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.text(`Name: ${demo.merchantName}`, 20, 50)
-      doc.text(`Category: ${demo.category}`, 20, 57)
-      doc.text(`Address: ${demo.address || 'N/A'}`, 20, 64)
-      doc.text(`Contact: ${demo.contactNumber || 'N/A'}`, 20, 71)
-      doc.text(`Email: ${demo.email || 'N/A'}`, 20, 78)
-      if (demo.website) {
-        doc.text(`Website: ${demo.website}`, 20, 85)
-      }
-      
-      // Add business details
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Business Details', 20, 100)
-      
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.text(`Products Interested: ${demo.productsInterested || 'N/A'}`, 20, 110)
-      doc.text(`Number of Outlets: ${demo.outlets || 'N/A'}`, 20, 117)
-      
-      // Add pain points
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Current Pain Points', 20, 135)
-      
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      const painPoints = demo.painPoints || 'No pain points specified'
-      const painPointsLines = doc.splitTextToSize(painPoints, 170)
-      doc.text(painPointsLines, 20, 145)
-      
-      // Add special notes if available
-      let currentY = 145 + (painPointsLines.length * 7) + 20
-      if (demo.specialNotes) {
+      // Helper function to add section header with background
+      const addSectionHeader = (text: string, y: number) => {
+        doc.setFillColor(240, 240, 240)
+        doc.rect(15, y - 5, 180, 12, 'F')
         doc.setFontSize(14)
         doc.setFont('helvetica', 'bold')
-        doc.text('Special Notes', 20, currentY)
+        doc.setTextColor(60, 60, 60)
+        doc.text(text, 20, y)
+        return y + 15
+      }
+
+      // Helper function to add field with label
+      const addField = (label: string, value: string | undefined, y: number, maxWidth: number = 170) => {
+        if (!value || value === 'N/A' || value === 'Not specified') return y
+        
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(80, 80, 80)
+        doc.text(`${label}:`, 20, y)
+        
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(40, 40, 40)
+        const lines = doc.splitTextToSize(value, maxWidth)
+        doc.text(lines, 25, y + 5)
+        
+        return y + 5 + (lines.length * 5) + 3
+      }
+
+      // Helper function to add content section
+      const addContentSection = (title: string, content: string, y: number, maxWidth: number = 170) => {
+        if (!content || content === 'N/A' || content === 'Not specified') return y
+        
+        doc.setFontSize(12)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(60, 60, 60)
+        doc.text(title, 20, y)
         
         doc.setFontSize(10)
         doc.setFont('helvetica', 'normal')
-        const specialNotesLines = doc.splitTextToSize(demo.specialNotes, 170)
-        doc.text(specialNotesLines, 20, currentY + 10)
-        currentY += 10 + (specialNotesLines.length * 7) + 10
+        doc.setTextColor(40, 40, 40)
+        const lines = doc.splitTextToSize(content, maxWidth)
+        doc.text(lines, 20, y + 8)
+        
+        return y + 8 + (lines.length * 5) + 8
       }
-      
-      // Add AI-generated insights
-      doc.setFontSize(14)
+
+      // Helper function to check if we need a new page
+      const checkPageBreak = (requiredSpace: number, currentY: number) => {
+        const pageHeight = doc.internal.pageSize.height
+        if (currentY + requiredSpace > pageHeight - 30) {
+          doc.addPage()
+          return 20
+        }
+        return currentY
+      }
+
+      let currentY = 20
+
+      // Add main title
+      doc.setFontSize(22)
       doc.setFont('helvetica', 'bold')
-      doc.text('AI-Generated Insights', 20, currentY)
-      
-      doc.setFontSize(10)
+      doc.setTextColor(30, 30, 30)
+      doc.text('Demo Preparation Brief', 105, currentY, { align: 'center' })
+      currentY += 15
+
+      // Add demo overview
+      doc.setFontSize(12)
       doc.setFont('helvetica', 'normal')
+      doc.setTextColor(80, 80, 80)
+      doc.text(`Demo Date: ${new Date(demo.scheduledDateTime).toLocaleDateString()}`, 105, currentY, { align: 'center' })
+      currentY += 8
+      doc.text(`Time: ${new Date(demo.scheduledDateTime).toLocaleTimeString()}`, 105, currentY, { align: 'center' })
+      currentY += 8
+      doc.text(`AE: ${demo.aeName}`, 105, currentY, { align: 'center' })
+      currentY += 8
+      doc.text(`Status: ${demo.status.charAt(0).toUpperCase() + demo.status.slice(1)}`, 105, currentY, { align: 'center' })
+      currentY += 20
+
+      // Check if we need a new page for merchant information
+      currentY = checkPageBreak(80, currentY)
+
+      // Add merchant information section
+      currentY = addSectionHeader('Merchant Information', currentY)
+      
+      // Basic merchant details
+      currentY = addField('Merchant Name', demo.merchantName, currentY)
+      currentY = addField('Category', demo.category, currentY)
+      currentY = addField('Address', demo.address, currentY)
+      currentY = addField('Contact Number', demo.contactNumber, currentY)
+      currentY = addField('Email', demo.email, currentY)
+      currentY = addField('Website', demo.website, currentY)
+      currentY = addField('Social Media', demo.socialMedia, currentY)
+      
+      // Check if we need a new page for business details
+      currentY = checkPageBreak(40, currentY)
+      
+      // Business details
+      currentY = addField('Products Interested', demo.productsInterested, currentY)
+      currentY = addField('Number of Outlets', demo.outlets, currentY)
+      
+      // Check if we need a new page for pain points
+      currentY = checkPageBreak(40, currentY)
+      
+      // Pain points section
+      currentY = addSectionHeader('Current Pain Points', currentY)
+      currentY = addContentSection('', demo.painPoints || 'No pain points specified', currentY)
+      
+      // Check if we need a new page for special notes
+      if (demo.specialNotes) {
+        currentY = checkPageBreak(40, currentY)
+        currentY = addSectionHeader('Special Notes', currentY)
+        currentY = addContentSection('', demo.specialNotes, currentY)
+      }
+
+      // Check if we need a new page for AI insights
+      currentY = checkPageBreak(60, currentY)
+      
+      // AI-Generated Insights section
+      currentY = addSectionHeader('AI-Generated Insights', currentY)
       if (briefData.insights) {
-        const insightsLines = doc.splitTextToSize(briefData.insights, 170)
-        doc.text(insightsLines, 20, currentY + 10)
-        currentY += 10 + (insightsLines.length * 7) + 10
+        currentY = addContentSection('', briefData.insights, currentY)
       } else {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'italic')
+        doc.setTextColor(120, 120, 120)
+        doc.text('No insights available', 20, currentY + 8)
         currentY += 20
       }
+
+      // Check if we need a new page for pitch suggestions
+      currentY = checkPageBreak(60, currentY)
       
-      // Add pitch suggestions
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Pitch Suggestions', 20, currentY)
-      
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
+      // Pitch suggestions section
+      currentY = addSectionHeader('Pitch Suggestions', currentY)
       if (briefData.pitch) {
-        const pitchLines = doc.splitTextToSize(briefData.pitch, 170)
-        doc.text(pitchLines, 20, currentY + 10)
-        currentY += 10 + (pitchLines.length * 7) + 10
+        currentY = addContentSection('', briefData.pitch, currentY)
       } else {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'italic')
+        doc.setTextColor(120, 120, 120)
+        doc.text('No pitch suggestions available', 20, currentY + 8)
         currentY += 20
       }
+
+      // Check if we need a new page for next steps
+      currentY = checkPageBreak(60, currentY)
       
-      // Add next steps
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Next Steps & Features', 20, currentY)
-      
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
+      // Next steps section
+      currentY = addSectionHeader('Next Steps & Features', currentY)
       if (briefData.next_steps) {
-        const nextStepsLines = doc.splitTextToSize(briefData.next_steps, 170)
-        doc.text(nextStepsLines, 20, currentY + 10)
+        currentY = addContentSection('', briefData.next_steps, currentY)
+      } else {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'italic')
+        doc.setTextColor(120, 120, 120)
+        doc.text('No next steps available', 20, currentY + 8)
+        currentY += 20
       }
+
+      // Check if we need a new page for meeting details
+      currentY = checkPageBreak(40, currentY)
       
-      // Add footer
-      const pageHeight = doc.internal.pageSize.height
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'italic')
-      doc.text(`Generated by ${aeName} on ${new Date().toLocaleDateString()}`, 20, pageHeight - 20)
-      doc.text('DemoGenie - AI-Powered Demo Preparation', 105, pageHeight - 15, { align: 'center' })
+      // Meeting details section
+      currentY = addSectionHeader('Meeting Details', currentY)
+      currentY = addField('Meeting Link', demo.meetingLink, currentY)
+      
+      // Add footer to all pages
+      const pageCount = (doc as any).internal.pages.length - 1
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        const pageHeight = doc.internal.pageSize.height
+        
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'italic')
+        doc.setTextColor(120, 120, 120)
+        doc.text(`Generated by ${aeName} on ${new Date().toLocaleDateString()}`, 20, pageHeight - 20)
+        doc.text('DemoGenie - AI-Powered Demo Preparation', 105, pageHeight - 15, { align: 'center' })
+        doc.text(`Page ${i} of ${pageCount}`, 105, pageHeight - 10, { align: 'center' })
+      }
       
       // Save the PDF
       const fileName = `PrepBrief_${demo.merchantName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
