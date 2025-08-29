@@ -57,7 +57,7 @@ export default function HomePage() {
                 <div className="w-16 h-16 bg-secondary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Users className="w-8 h-8 text-secondary" />
                 </div>
-                <h2 className="text-2xl font-bold mb-4">AE Dashboard</h2>
+                <h2 className="text-2xl font-bold mb-4">Sales Dashboard</h2>
                 <p className="text-muted-foreground mb-6 text-pretty">
                   Access your demo pipeline, preparation briefs, and calendar. Manage your prospects with AI-powered
                   insights.

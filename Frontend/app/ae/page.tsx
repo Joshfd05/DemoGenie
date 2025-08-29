@@ -484,7 +484,7 @@ export default function AEPage() {
           <CardHeader className="text-center">
             <CardTitle className="flex items-center justify-center gap-2">
               <Users className="w-6 h-6 text-primary" />
-              AE Dashboard Login
+              Sales Dashboard Login
             </CardTitle>
           </CardHeader>
           <CardContent>

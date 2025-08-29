@@ -136,7 +136,7 @@ def seed_data():
             special_notes="Interested in integration with existing accounting software",
             assigned_ae_id=ae1.id,
             scheduled_time=datetime(2024, 1, 15, 14, 0),
-            meeting_link="https://meet.google.com/abc-defg-hij",
+            meeting_link="https://meet.google.com/zsp-mgca-qso?hs=197&hs=187&authuser=0&ijlm=1756460105373&adhoc=1",
             prep_brief_status="Pending",
             status="upcoming"
         )
@@ -154,7 +154,7 @@ def seed_data():
             special_notes="Currently using Square, looking to upgrade",
             assigned_ae_id=ae2.id,
             scheduled_time=datetime(2024, 1, 16, 10, 30),
-            meeting_link="https://zoom.us/j/123456789",
+            meeting_link="https://zoom.us/j/99580702559?pwd=xulkhpSR8Ia1wkTL7UXXVPXAv45OUR.1",
             prep_brief_status="Pending",
             status="upcoming"
         )
