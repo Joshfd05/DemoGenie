@@ -213,17 +213,33 @@ def get_prep_brief(merchant_id: UUID, db: Session = Depends(get_db)) -> PrepBrie
 
 @router.get("/calendar-events")
 def calendar_events_mock(db: Session = Depends(get_db)):
-    # Return AE availability snapshot
-    aes = db.query(AEModel).all()
+    # Return actual demo bookings for calendar display
+    bookings = db.query(MerchantBookingModel).filter(
+        MerchantBookingModel.status.in_(["upcoming", "prep-needed"])
+    ).all()
+    
+    calendar_events = []
+    for booking in bookings:
+        if booking.scheduled_time:
+            ae_name = ""
+            if booking.assigned_ae_id:
+                ae = db.query(AEModel).filter(AEModel.id == booking.assigned_ae_id).first()
+                ae_name = ae.name if ae else ""
+            
+            calendar_events.append({
+                "id": str(booking.id),
+                "merchant_name": booking.merchant_name,
+                "scheduled_time": booking.scheduled_time.isoformat(),
+                "ae_name": ae_name,
+                "category": booking.restaurant_category,
+                "status": booking.status,
+                "meeting_link": booking.meeting_link or "",
+                "prep_brief_status": booking.prep_brief_status,
+            })
+    
     return {
-        "aes": [
-            {
-                "id": str(ae.id),
-                "name": ae.name,
-                "booked_slots": [],  # Mock for now
-            }
-            for ae in aes
-        ]
+        "events": calendar_events,
+        "total_events": len(calendar_events)
     }
 
 

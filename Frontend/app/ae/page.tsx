@@ -58,6 +58,17 @@ interface Demo {
   prep_brief_status?: string
 }
 
+interface CalendarEvent {
+  id: string
+  merchant_name: string
+  scheduled_time: string
+  ae_name: string
+  category: string
+  status: string
+  meeting_link: string
+  prep_brief_status: string
+}
+
 async function fetchDemos(): Promise<Demo[]> {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
   const res = await fetch(`${baseUrl}/demos`, { cache: "no-store" })
@@ -102,6 +113,10 @@ export default function AEPage() {
   const [previewModalOpen, setPreviewModalOpen] = useState<string | null>(null)
   const [generatingPDF, setGeneratingPDF] = useState<Record<string, boolean>>({})
   const [markingComplete, setMarkingComplete] = useState<Record<string, boolean>>({})
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
+  const [calendarLoading, setCalendarLoading] = useState(false)
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null)
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -475,6 +490,99 @@ export default function AEPage() {
     const rate = total > 0 ? Math.round((generated / total) * 100) : 0
     return { todaysCount, pending, rate }
   }, [demos])
+
+  // Function to fetch calendar events
+  const fetchCalendarEvents = async () => {
+    try {
+      setCalendarLoading(true)
+      const res = await fetch(`${baseUrl}/calendar-events`, { cache: "no-store" })
+      if (!res.ok) throw new Error("Failed to load calendar events")
+      const data = await res.json()
+      setCalendarEvents(data.events || [])
+    } catch (err) {
+      console.error(err)
+      toast({ title: "Failed to load calendar", description: String(err), variant: "destructive" })
+    } finally {
+      setCalendarLoading(false)
+    }
+  }
+
+  // Fetch calendar events when logged in
+  useEffect(() => {
+    if (!isLoggedIn) return
+    fetchCalendarEvents()
+  }, [isLoggedIn])
+
+  // Refresh calendar when demos change
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchCalendarEvents()
+    }
+  }, [demos, isLoggedIn])
+
+  // Calendar utility functions
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const startDate = new Date(firstDay)
+    startDate.setDate(startDate.getDate() - firstDay.getDay() + 1) // Start from Monday
+    
+    const days = []
+    const currentDate = new Date(startDate)
+    
+    // Generate 42 days (6 weeks) to ensure we cover the month
+    for (let i = 0; i < 42; i++) {
+      days.push(new Date(currentDate))
+      currentDate.setDate(currentDate.getDate() + 1)
+    }
+    
+    return days
+  }
+
+  const getEventsForDate = (date: Date) => {
+    return calendarEvents.filter(event => {
+      const eventDate = new Date(event.scheduled_time)
+      return eventDate.getDate() === date.getDate() && 
+             eventDate.getMonth() === date.getMonth() && 
+             eventDate.getFullYear() === date.getFullYear()
+    })
+  }
+
+  const formatTime = (dateTimeString: string) => {
+    const date = new Date(dateTimeString)
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    })
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'upcoming': return 'bg-primary text-primary-foreground'
+      case 'prep-needed': return 'bg-secondary text-secondary-foreground'
+      case 'completed': return 'bg-green-500 text-white'
+      default: return 'bg-muted text-muted-foreground'
+    }
+  }
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentMonth(prev => {
+      const newMonth = new Date(prev)
+      if (direction === 'prev') {
+        newMonth.setMonth(newMonth.getMonth() - 1)
+      } else {
+        newMonth.setMonth(newMonth.getMonth() + 1)
+      }
+      return newMonth
+    })
+  }
+
+  const handleCalendarEventClick = (event: CalendarEvent) => {
+    setSelectedCalendarEvent(event)
+  }
 
   if (!isLoggedIn) {
     return (
@@ -1126,36 +1234,229 @@ export default function AEPage() {
           <TabsContent value="calendar">
             <Card className="glass">
               <CardHeader>
-                <CardTitle>Weekly Calendar</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-primary" />
+                    Demo Calendar
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={fetchCalendarEvents}
+                    disabled={calendarLoading}
+                  >
+                    <Loader2 className={`w-4 h-4 mr-2 ${calendarLoading ? 'animate-spin' : 'hidden'}`} />
+                    Refresh
+                  </Button>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-7 gap-2 mb-4">
-                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                    <div key={day} className="text-center font-medium p-2">
-                      {day}
+                {calendarLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    <span className="ml-2">Loading calendar...</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-6">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigateMonth('prev')} 
+                        disabled={calendarLoading}
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                        Previous
+                      </Button>
+                      <h2 className="text-xl font-bold">
+                        {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                      </h2>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigateMonth('next')} 
+                        disabled={calendarLoading}
+                      >
+                        Next
+                        <ArrowLeft className="w-4 h-4 rotate-180" />
+                      </Button>
                     </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 gap-2">
-                  {Array.from({ length: 35 }, (_, i) => (
-                    <div key={i} className="aspect-square p-2 glass rounded-lg hover-glow cursor-pointer">
-                      <div className="text-sm">{(i % 31) + 1}</div>
-                      {i === 14 && (
-                        <div className="text-xs bg-primary text-primary-foreground rounded px-1 mt-1">Bella Vista</div>
-                      )}
-                      {i === 15 && (
-                        <div className="text-xs bg-secondary text-secondary-foreground rounded px-1 mt-1">
-                          Quick Bites
+                    
+                    <div className="grid grid-cols-7 gap-2 mb-4">
+                      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                        <div key={day} className="text-center font-medium p-2 text-muted-foreground">
+                          {day}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
+                    
+                    <div className="grid grid-cols-7 gap-2">
+                      {getDaysInMonth(currentMonth).map((day, index) => {
+                        const events = getEventsForDate(day)
+                        const isCurrentMonth = day.getMonth() === currentMonth.getMonth()
+                        const isToday = new Date().toDateString() === day.toDateString()
+                        
+                        return (
+                          <div 
+                            key={index} 
+                            className={`aspect-square p-2 glass rounded-lg hover-glow transition-all ${
+                              !isCurrentMonth ? 'opacity-30' : ''
+                            } ${isToday ? 'ring-2 ring-primary/50' : ''}`}
+                          >
+                            <div className={`text-sm font-medium ${isToday ? 'text-primary' : ''}`}>
+                              {day.getDate()}
+                            </div>
+                            
+                            {events.length > 0 && (
+                              <div className="space-y-1 mt-1">
+                                {events.slice(0, 2).map((event, eventIndex) => (
+                                  <div 
+                                    key={event.id} 
+                                    className={`text-xs rounded px-1 py-0.5 truncate ${getStatusColor(event.status)} cursor-pointer hover:opacity-80 transition-opacity`}
+                                    title={`${event.merchant_name} - ${formatTime(event.scheduled_time)}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleCalendarEventClick(event)
+                                    }}
+                                  >
+                                    {event.merchant_name}
+                                  </div>
+                                ))}
+                                {events.length > 2 && (
+                                  <div className="text-xs text-muted-foreground text-center">
+                                    +{events.length - 2} more
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    
+                    {calendarEvents.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>No upcoming demos scheduled</p>
+                        <p className="text-sm">Bookings will appear here automatically</p>
+                      </div>
+                    )}
+                    
+                    {calendarEvents.length > 0 && (
+                      <div className="mt-6 p-4 bg-muted/30 rounded-lg">
+                        <h3 className="font-semibold mb-3">Legend</h3>
+                        <div className="flex flex-wrap gap-3 text-sm">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-primary rounded-full"></div>
+                            <span>Upcoming</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-secondary rounded-full"></div>
+                            <span>Prep Needed</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                            <span>Completed</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Calendar Event Details Modal */}
+      <Dialog open={!!selectedCalendarEvent} onOpenChange={(open) => !open && setSelectedCalendarEvent(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
+              Demo Details
+            </DialogTitle>
+          </DialogHeader>
+          {selectedCalendarEvent && (
+            <div className="space-y-6">
+              {/* Event Header */}
+              <div className="text-center pb-4 border-b border-muted">
+                <h3 className="text-xl font-semibold text-foreground mb-2">{selectedCalendarEvent.merchant_name}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(selectedCalendarEvent.scheduled_time).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </p>
+                <p className="text-lg font-medium text-primary">
+                  {formatTime(selectedCalendarEvent.scheduled_time)}
+                </p>
+              </div>
+
+              {/* Event Details */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                  <Badge variant={selectedCalendarEvent.status === 'upcoming' ? 'default' : 'secondary'} className="mt-1">
+                    {selectedCalendarEvent.status === 'upcoming' ? 'Ready' : 'Prep Needed'}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Category</Label>
+                  <p className="text-sm mt-1">{selectedCalendarEvent.category}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Assigned AE</Label>
+                  <p className="text-sm mt-1">{selectedCalendarEvent.ae_name || 'Not assigned'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Prep Brief</Label>
+                  <Badge variant={selectedCalendarEvent.prep_brief_status === 'Generated' ? 'default' : 'secondary'} className="mt-1">
+                    {selectedCalendarEvent.prep_brief_status}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Meeting Link */}
+              {selectedCalendarEvent.meeting_link && (
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Meeting Link</Label>
+                  <a
+                    href={selectedCalendarEvent.meeting_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary hover:underline break-all block mt-1"
+                  >
+                    {selectedCalendarEvent.meeting_link}
+                  </a>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-muted">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSelectedCalendarEvent(null)}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+                {selectedCalendarEvent.meeting_link && (
+                  <Button asChild className="flex-1">
+                    <a href={selectedCalendarEvent.meeting_link} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Join Meeting
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
