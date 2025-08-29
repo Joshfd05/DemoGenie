@@ -6,12 +6,33 @@ FastAPI backend that powers the DemoGenie frontend. Provides endpoints to replac
 - Python 3.11+
 - pip or uv/pipx
 
-## Install
+## Quick Setup (5 minutes)
+
+### 1. Install Dependencies
 ```bash
 cd /home/joshua/DemoGenie/Backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+### 2. Setup PostgreSQL Database
+```bash
+# Option A: Using Docker (recommended for demo)
+docker run --name postgres-demo -e POSTGRES_PASSWORD=password -e POSTGRES_DB=demogenie -p 5432:5432 -d postgres:15
+
+# Option B: Using local PostgreSQL
+sudo systemctl start postgresql
+sudo -u postgres psql -c "CREATE USER postgres WITH PASSWORD 'password' SUPERUSER;"
+```
+
+### 3. Initialize Database
+```bash
+# Copy environment file
+cp env.example .env
+
+# Run setup script
+python setup_db.py
 ```
 
 ## Environment Setup

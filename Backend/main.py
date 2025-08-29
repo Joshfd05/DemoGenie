@@ -4,6 +4,7 @@ import uvicorn
 
 # Local modules
 from .routes import router
+from .database import create_tables, seed_data
 from .config import config
 
 
@@ -25,6 +26,17 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup."""
+    try:
+        create_tables()
+        seed_data()
+        print("✅ Database initialized successfully!")
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        print("⚠️  Make sure PostgreSQL is running and DATABASE_URL is correct")
 
 
 if __name__ == "__main__":
