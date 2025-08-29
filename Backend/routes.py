@@ -16,8 +16,7 @@ from .models import (
     MerchantBooking,
     PrepBrief,
 )
-from .utils import assign_ae, calendar_mock_book, create_meeting_link
-from .ai_service import ai_service
+from .utils import assign_ae, calendar_mock_book, create_meeting_link, generate_ai_brief
 
 
 router = APIRouter()
@@ -113,7 +112,7 @@ def list_demos() -> List[DemoCard]:
 
 
 @router.post("/generate-brief/{merchant_id}", response_model=PrepBrief)
-def generate_brief(merchant_id: UUID) -> PrepBrief:
+async def generate_brief(merchant_id: UUID) -> PrepBrief:
     booking = db.bookings.get(merchant_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Merchant booking not found")
@@ -121,7 +120,7 @@ def generate_brief(merchant_id: UUID) -> PrepBrief:
         raise HTTPException(status_code=400, detail="No AE assigned to booking")
     ae = db.aes[booking.assigned_ae]
 
-    brief = ai_service.generate_prep_brief(booking, ae)
+    brief = await generate_ai_brief(booking, ae)
     db.briefs[brief.id] = brief
     booking.prep_brief_status = "Generated"
     return brief

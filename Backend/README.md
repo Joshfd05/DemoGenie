@@ -1,6 +1,6 @@
 # DemoGenie Backend (FastAPI)
 
-FastAPI backend that powers the DemoGenie frontend. Provides endpoints to replace frontend dummy data with real API responses, matching the exact JSON shapes used by the current UI.
+FastAPI backend that powers the DemoGenie frontend. Provides endpoints to replace frontend dummy data with real API responses, matching the exact JSON shapes used by the current UI. Includes AI-powered prep brief generation using OpenAI.
 
 ## Requirements
 - Python 3.11+
@@ -14,22 +14,17 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## AI Setup (Optional)
-For AI-powered prep brief generation:
+## Environment Setup
+1. Copy the example environment file:
+```bash
+cp env.example .env
+```
 
-1. **Get OpenAI API Key**
-   - Visit https://platform.openai.com/api-keys
-   - Create a new API key
-
-2. **Configure Environment**
-   ```bash
-   cp env.example .env
-   # Edit .env and add your OpenAI API key
-   ```
-
-3. **Test AI Integration**
-   - Generate a prep brief from the AE dashboard
-   - Check console logs for AI status
+2. The OpenAI API key is already configured in `env.example`. If you need to update it:
+```bash
+# Edit .env and update OPENAI_API_KEY
+OPENAI_API_KEY=your_openai_api_key_here
+```
 
 ## Run
 ```bash
@@ -44,17 +39,23 @@ python -m Backend.main
 - Open docs at http://localhost:8000/docs
 
 ## Endpoints
-- POST /book-demo → Assign AE, schedule, return confirmation card shape
-- GET /merchant/{merchant_id} → Confirmation card data
-- GET /demos → AE dashboard list items matching frontend mock
-- POST /generate-brief/{merchant_id} → Mock AI brief generation
-- GET /prep-brief/{merchant_id} → Retrieve generated brief
-- GET /calendar-events → Mock AE availability and booked slots
+- POST `/book-demo` → Assign AE, schedule, return confirmation card shape
+- GET `/merchant/{merchant_id}` → Confirmation card data
+- GET `/demos` → AE dashboard list items matching frontend mock
+- POST `/generate-brief/{merchant_id}` → AI-powered prep brief generation (OpenAI)
+- GET `/prep-brief/{merchant_id}` → Retrieve generated brief
+- GET `/calendar-events` → Mock AE availability and booked slots
+
+## AI Features
+- **Prep Brief Generation**: Uses OpenAI GPT-4 to generate personalized prep briefs
+- **Fallback**: If OpenAI is unavailable, uses intelligent mock responses
+- **Structured Output**: AI responses are parsed into consistent JSON format
+- **Error Handling**: Graceful fallback to mock data if API calls fail
 
 ## Notes
 - Uses in-memory storage with seeded AEs and bookings for demo speed
 - JSON response keys mirror the frontend dummy objects so no UI changes are required
-- AI integration automatically falls back to mock data if OpenAI is unavailable
-- Calendar integration is mocked; swap out in utils.py
+- Calendar integration is mocked; swap out in `utils.py`
+- OpenAI API key is configured and ready to use
 
 
