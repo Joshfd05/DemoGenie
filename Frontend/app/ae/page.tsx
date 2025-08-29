@@ -137,10 +137,10 @@ export default function AEPage() {
   const baseUrl = useMemo(() => process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000", [])
 
   function mapBriefPayload(raw: any): { insights: string; pitch: string; next_steps: string } {
-    // Backend fields: insights, pain_points_summary, relevant_features, pitch_suggestions, status
+    // Enhanced backend fields: insights (company_insights), pain_points_summary, relevant_features, pitch_suggestions
     const insights = [raw?.insights, raw?.pain_points_summary].filter(Boolean).join("\n\n") || ""
     const pitch = raw?.pitch_suggestions || raw?.pitch || ""
-    const nextSteps = raw?.next_steps || raw?.relevant_features || raw?.status || ""
+    const nextSteps = raw?.relevant_features || raw?.next_steps || raw?.status || ""
     return { insights, pitch, next_steps: nextSteps }
   }
 
@@ -1065,18 +1065,18 @@ export default function AEPage() {
                         Prep Brief
                       </h4>
                       {briefs[demo.id] ? (
-                        <div className="space-y-3 text-sm">
+                        <div className="space-y-4 text-sm">
                           <div>
-                            <Label className="font-medium">Insights</Label>
-                            <p className="text-muted-foreground whitespace-pre-wrap">{briefs[demo.id]?.insights}</p>
+                            <Label className="font-medium text-primary">Company Insights & Pain Points</Label>
+                            <p className="text-muted-foreground whitespace-pre-wrap mt-1">{briefs[demo.id]?.insights}</p>
                           </div>
                           <div>
-                            <Label className="font-medium">Pitch</Label>
-                            <p className="text-muted-foreground whitespace-pre-wrap">{briefs[demo.id]?.pitch}</p>
+                            <Label className="font-medium text-primary">Pitch Strategy</Label>
+                            <p className="text-muted-foreground whitespace-pre-wrap mt-1">{briefs[demo.id]?.pitch}</p>
                           </div>
                           <div>
-                            <Label className="font-medium">Next Steps</Label>
-                            <p className="text-muted-foreground whitespace-pre-wrap">{briefs[demo.id]?.next_steps}</p>
+                            <Label className="font-medium text-primary">Product Features & Next Steps</Label>
+                            <p className="text-muted-foreground whitespace-pre-wrap mt-1">{briefs[demo.id]?.next_steps}</p>
                           </div>
                         </div>
                       ) : demo.prep_brief_status === "Generated" ? (

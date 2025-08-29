@@ -107,4 +107,13 @@ class PrepBrief(BaseModel):
     status: str = "Pending"
 
 
+class EnhancedPrepBrief(BaseModel):
+    """Enhanced prep brief with structured content for better AE preparation."""
+    company_insights: str
+    pain_points_summary: str
+    relevant_product_features: List[str]
+    pitch_suggestions: List[str]
+    status: str = "Generated"
+
+
 

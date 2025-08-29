@@ -203,9 +203,9 @@ def get_prep_brief(merchant_id: UUID, db: Session = Depends(get_db)) -> PrepBrie
         id=brief.id,
         merchant_id=brief.merchant_id,
         ae_id=brief.ae_id,
-        insights=brief.insights,
+        insights=brief.company_insights or brief.insights,  # Use enhanced field if available
         pain_points_summary=brief.pain_points_summary,
-        relevant_features=brief.relevant_features,
+        relevant_features=brief.relevant_product_features or brief.relevant_features,  # Use enhanced field if available
         pitch_suggestions=brief.pitch_suggestions,
         status=brief.status,
     )

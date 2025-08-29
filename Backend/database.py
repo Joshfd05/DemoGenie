@@ -74,6 +74,9 @@ class PrepBriefModel(Base):
     pain_points_summary = Column(Text, nullable=False)
     relevant_features = Column(Text, nullable=False)
     pitch_suggestions = Column(Text, nullable=False)
+    # New enhanced fields
+    company_insights = Column(Text, nullable=True)
+    relevant_product_features = Column(Text, nullable=True)  # JSON array as string
     status = Column(String, default="Pending")
     created_at = Column(DateTime, default=datetime.utcnow)
     
